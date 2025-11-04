@@ -1,0 +1,38 @@
+[
+  {
+    "key": "post:id:welcome2025",
+    "value": "{\"id\":\"welcome2025\",\"slug\":\"welcome\",\"title\":\"欢迎使用 Cloudflare Pages 博客\",\"content\":\"# 欢迎来到我的博客\\n\\n这是一个基于 Cloudflare Pages 构建的现代化博客系统，完全无需 npm 构建，适合手机部署。\\n\\n## 核心特性\\n\\n### 零依赖架构\\n\\n- 纯原生 ES Modules\\n- 无任何 npm 包\\n- 无需本地构建环境\\n- 手机即可完成部署\\n\\n### Adams 风格主题\\n\\n- 简洁优雅的卡片设计\\n- 精心调校的圆角和阴影\\n- 支持亮暗色主题切换\\n- 响应式布局适配\\n\\n### 现代化动效\\n\\n- View Transitions API 原生支持\\n- PJAX 降级方案\\n- 卡片交错上移动画\\n- 流畅的页面切换\\n\\n### 完整博客功能\\n\\n- **文章管理**：发布、编辑、删除\\n- **Markdown 支持**：标题、粗体、链接、图片、代码\\n- **分类标签**：灵活的内容组织\\n- **置顶草稿**：重要文章置顶，草稿自动保存\\n- **友情链接**：展示你的朋友圈\\n- **RSS 订阅**：自动生成 XML\\n\\n## 技术栈\\n\\n### 前端\\n\\n- 原生 JavaScript ES Modules\\n- CSS Variables 主题系统\\n- Web API（Fetch、History、LocalStorage）\\n\\n### 后端\\n\\n- Cloudflare Pages Functions\\n- Cloudflare KV（数据库）\\n- Cloudflare R2（图片存储）\\n\\n### 部署\\n\\n- Git 自动部署\\n- 全球 CDN 加速\\n- 免费 SSL 证书\\n\\n## 快速开始\\n\\n1. **Fork 仓库**到你的 GitHub\\n2. **连接到 Cloudflare Pages**\\n3. **配置 KV 和 R2**\\n4. **设置环境变量**\\n5. **部署完成**\\n\\n详细步骤请查看 [README.md](https://github.com)。\\n\\n## 性能表现\\n\\n- Lighthouse Performance: **95+**\\n- First Contentful Paint: **< 1s**\\n- Time to Interactive: **< 2s**\\n- 全球平均加载时间: **< 500ms**\\n\\n## 开始写作\\n\\n访问 `/admin.html` 登录后台，即可开始你的创作之旅。\\n\\n祝你使用愉快！\",\"excerpt\":\"这是一个基于 Cloudflare Pages 构建的现代化博客系统，完全无需 npm 构建，适合手机部署。\",\"category\":\"公告\",\"tags\":[\"欢迎\",\"博客\",\"Cloudflare\"],\"cover\":\"\",\"status\":\"published\",\"pinned\":true,\"views\":128,\"createdAt\":1730764110000,\"updatedAt\":1730764110000}"
+  },
+  {
+    "key": "post:slug:welcome",
+    "value": "welcome2025"
+  },
+  {
+    "key": "post:id:cf-pages-guide",
+    "value": "{\"id\":\"cf-pages-guide\",\"slug\":\"cloudflare-pages-deployment\",\"title\":\"Cloudflare Pages 完整部署指南\",\"content\":\"# Cloudflare Pages 完整部署指南\\n\\n本文将详细介绍如何在 Cloudflare Pages 上部署静态网站和全栈应用。\\n\\n## 什么是 Cloudflare Pages\\n\\nCloudflare Pages 是 Cloudflare 推出的 Jamstack 平台，提供：\\n\\n- **全球 CDN**：自动分发到全球 200+ 城市\\n- **无限带宽**：真正的无限流量\\n- **免费 SSL**：自动 HTTPS\\n- **Git 集成**：推送即部署\\n- **边缘函数**：服务端逻辑支持\\n\\n## 部署步骤\\n\\n### 1. 准备项目\\n\\n确保项目包含以下内容：\\n\\n```bash\\nproject/\\n├── public/          # 静态资源\\n├── functions/       # 边缘函数（可选）\\n└── _routes.json     # 路由配置（可选）\\n```\\n\\n### 2. 连接 Git\\n\\n1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)\\n2. 进入 **Workers & Pages**\\n3. 点击 **Create application**\\n4. 选择 **Pages** → **Connect to Git**\\n5. 授权 GitHub 并选择仓库\\n\\n### 3. 配置构建\\n\\n**无构建项目**（如本博客）：\\n- Build command: 留空\\n- Build output directory: `public`\\n\\n**React/Vue 项目**：\\n- Build command: `npm run build`\\n- Build output directory: `dist` 或 `build`\\n\\n### 4. 环境变量\\n\\n在项目设置中添加环境变量：\\n\\n```\\nAPI_KEY=your-secret-key\\nDATABASE_URL=...\\n```\\n\\n### 5. 部署\\n\\n点击 **Save and Deploy**，等待部署完成。\\n\\n## 高级功能\\n\\n### Pages Functions\\n\\n在 `functions/` 目录创建服务端函数：\\n\\n```javascript\\n// functions/api/hello.js\\nexport async function onRequest(context) {\\n  return new Response('Hello World!');\\n}\\n```\\n\\n访问 `https://your-site.pages.dev/api/hello`\\n\\n### KV 存储\\n\\n绑定 KV Namespace 后：\\n\\n```javascript\\nexport async function onRequest(context) {\\n  const { env } = context;\\n  const value = await env.MY_KV.get('key');\\n  return new Response(value);\\n}\\n```\\n\\n### R2 存储\\n\\n绑定 R2 Bucket 后：\\n\\n```javascript\\nexport async function onRequest(context) {\\n  const { env, request } = context;\\n  const formData = await request.formData();\\n  const file = formData.get('file');\\n  \\n  await env.MY_BUCKET.put('filename', file.stream());\\n  return new Response('Upload success');\\n}\\n```\\n\\n## 性能优化\\n\\n### 缓存策略\\n\\n```javascript\\nexport async function onRequest(context) {\\n  return new Response('content', {\\n    headers: {\\n      'Cache-Control': 'public, max-age=3600'\\n    }\\n  });\\n}\\n```\\n\\n### 图片优化\\n\\n使用 Cloudflare Images 或 Image Resizing。\\n\\n### 压缩\\n\\nCloudflare 自动启用 Brotli/Gzip 压缩。\\n\\n## 自定义域名\\n\\n1. 进入项目 **Custom domains**\\n2. 点击 **Set up a custom domain**\\n3. 输入域名并按照提示配置 DNS\\n4. 等待 SSL 证书生成（通常几分钟）\\n\\n## 故障排查\\n\\n### 构建失败\\n\\n- 检查 `package.json` 中的构建脚本\\n- 查看构建日志中的错误信息\\n- 确保依赖版本兼容\\n\\n### 函数错误\\n\\n- 查看 **Functions logs**\\n- 使用 `console.log()` 调试\\n- 检查环境变量绑定\\n\\n### 性能问题\\n\\n- 使用 Cloudflare Analytics 分析\\n- 检查资源大小和数量\\n- 启用缓存策略\\n\\n## 总结\\n\\nCloudflare Pages 提供了强大而简单的部署方案，特别适合：\\n\\n- 静态网站\\n- Jamstack 应用\\n- 全栈应用（配合 Functions）\\n- 个人博客\\n\\n立即开始你的 Cloudflare Pages 之旅吧！\",\"excerpt\":\"详细介绍如何在 Cloudflare Pages 上部署静态网站和全栈应用，包括 Git 集成、环境变量、KV/R2 存储等高级功能。\",\"category\":\"技术\",\"tags\":[\"Cloudflare\",\"部署\",\"教程\"],\"cover\":\"\",\"status\":\"published\",\"pinned\":false,\"views\":89,\"createdAt\":1730678400000,\"updatedAt\":1730678400000}"
+  },
+  {
+    "key": "post:slug:cloudflare-pages-deployment",
+    "value": "cf-pages-guide"
+  },
+  {
+    "key": "post:id:markdown-guide",
+    "value": "{\"id\":\"markdown-guide\",\"slug\":\"markdown-syntax\",\"title\":\"Markdown 语法完全指南\",\"content\":\"# Markdown 语法完全指南\\n\\nMarkdown 是一种轻量级标记语言，让你用简单的语法编写格式化文档。\\n\\n## 标题\\n\\n使用 `#` 创建标题：\\n\\n```markdown\\n# 一级标题\\n## 二级标题\\n### 三级标题\\n```\\n\\n## 文本样式\\n\\n**粗体文本**使用 `**文本**` 或 `__文本__`\\n\\n*斜体文本*使用 `*文本*` 或 `_文本_`\\n\\n***粗斜体***使用 `***文本***`\\n\\n## 链接和图片\\n\\n**链接**：`[链接文字](URL)`\\n\\n示例：[访问 Cloudflare](https://www.cloudflare.com)\\n\\n**图片**：`![图片描述](图片URL)`\\n\\n## 列表\\n\\n**无序列表**使用 `-`、`*` 或 `+`：\\n\\n- 第一项\\n- 第二项\\n- 第三项\\n\\n**有序列表**使用数字：\\n\\n1. 第一步\\n2. 第二步\\n3. 第三步\\n\\n## 代码\\n\\n**行内代码**使用反引号：`const x = 1;`\\n\\n**代码块**使用三个反引号：\\n\\n```javascript\\nfunction hello() {\\n  console.log('Hello World');\\n}\\n```\\n\\n## 引用\\n\\n使用 `>` 创建引用：\\n\\n> 这是一段引用文字。\\n> 可以包含多行。\\n\\n## 分隔线\\n\\n使用三个 `-` 或 `*` 创建分隔线：\\n\\n---\\n\\n## 表格\\n\\n```markdown\\n| 列1 | 列2 | 列3 |\\n|-----|-----|-----|\\n| 数据1 | 数据2 | 数据3 |\\n```\\n\\n## 任务列表\\n\\n```markdown\\n- [x] 已完成任务\\n- [ ] 未完成任务\\n```\\n\\n## 最佳实践\\n\\n1. **保持简洁**：Markdown 的优势在于简单\\n2. **一致性**：选择一种风格并坚持使用\\n3. **适度使用**：不要过度格式化\\n4. **预览检查**：发布前预览效果\\n\\n## 总结\\n\\nMarkdown 是写作的好工具，掌握这些语法就能创作出漂亮的文档。\\n\\n开始你的 Markdown 写作之旅吧！\",\"excerpt\":\"完整介绍 Markdown 语法，包括标题、文本样式、链接、图片、列表、代码、引用等常用功能。\",\"category\":\"技术\",\"tags\":[\"Markdown\",\"写作\",\"教程\"],\"cover\":\"\",\"status\":\"published\",\"pinned\":false,\"views\":64,\"createdAt\":1730592000000,\"updatedAt\":1730592000000}"
+  },
+  {
+    "key": "post:slug:markdown-syntax",
+    "value": "markdown-guide"
+  },
+  {
+    "key": "idx:post:time",
+    "value": "[\"welcome2025\",\"cf-pages-guide\",\"markdown-guide\"]"
+  },
+  {
+    "key": "links:friend",
+    "value": "[{\"name\":\"Cloudflare\",\"url\":\"https://www.cloudflare.com\",\"desc\":\"全球领先的网络服务提供商\",\"avatar\":\"https://www.cloudflare.com/favicon.ico\"},{\"name\":\"GitHub\",\"url\":\"https://github.com\",\"desc\":\"全球最大的代码托管平台\",\"avatar\":\"https://github.githubassets.com/favicons/favicon.svg\"},{\"name\":\"MDN Web Docs\",\"url\":\"https://developer.mozilla.org\",\"desc\":\"Web 开发者的最佳学习资源\",\"avatar\":\"https://developer.mozilla.org/favicon-48x48.cbbd161b.png\"},{\"name\":\"Stack Overflow\",\"url\":\"https://stackoverflow.com\",\"desc\":\"程序员的问答社区\",\"avatar\":\"https://cdn.sstatic.net/Sites/stackoverflow/Img/favicon.ico\"}]"
+  },
+  {
+    "key": "site:settings",
+    "value": "{\"name\":\"我的博客\",\"description\":\"一个简洁优雅的个人博客\",\"author\":\"博主\",\"footer\":\"Powered by Cloudflare Pages\"}"
+  }
+]

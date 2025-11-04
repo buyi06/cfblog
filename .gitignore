@@ -1,0 +1,41 @@
+# 编辑器和系统文件
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志文件
+*.log
+npm-debug.log*
+
+# 依赖目录（虽然本项目无依赖，但预留）
+node_modules/
+
+# 构建输出（本项目无构建，但预留）
+dist/
+build/
+
+# 环境变量（如果有本地测试）
+.env
+.env.local
+.env.*.local
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 操作系统文件
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 备份文件
+*.bak
+*.backup
+
+# 测试覆盖率
+coverage/
+.nyc_output/
