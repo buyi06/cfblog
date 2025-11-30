@@ -155,13 +155,17 @@ async function loadPageContent() {
 async function loadHomePage() {
   const container = document.getElementById('post-list');
   if (!container) return;
-  
+
   showLoading(container);
-  
+
   try {
     const response = await fetch('/api/posts?page=1&limit=10');
+    if (!response.ok) {
+      throw new Error('加载文章失败');
+    }
+
     const data = await response.json();
-    
+
     if (data.posts && data.posts.length > 0) {
       AppState.posts = data.posts;
       AppState.totalPages = data.totalPages || 1;
@@ -183,6 +187,7 @@ function renderPostList(container, posts) {
           <span class="post-meta-item">${formatDate(post.createdAt)}</span>
           ${post.category ? `<span class="post-meta-item">${post.category}</span>` : ''}
           <span class="post-meta-item">${post.views || 0} 次浏览</span>
+          ${post.pinned ? '<span class="post-badge">置顶</span>' : ''}
         </div>
         <a href="/post/${post.slug}" class="post-title">${escapeHtml(post.title)}</a>
       </div>
@@ -259,8 +264,12 @@ async function loadArchivePage() {
   
   try {
     const response = await fetch('/api/posts?archive=true');
+    if (!response.ok) {
+      throw new Error('加载归档失败');
+    }
+
     const data = await response.json();
-    
+
     if (data.posts && data.posts.length > 0) {
       renderArchiveList(container, data.posts);
     } else {

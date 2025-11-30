@@ -223,6 +223,16 @@ body {
   gap: var(--spacing-xs);
 }
 
+.post-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  background: rgba(94, 92, 255, 0.12);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+}
+
 .post-title {
   font-size: 1.5rem;
   font-weight: 600;
