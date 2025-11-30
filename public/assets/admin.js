@@ -165,6 +165,8 @@ function showNewPostForm() {
       </form>
     </div>
   `;
+
+  initPostFormEnhancements();
 }
 
 function initEditor() {
@@ -188,6 +190,23 @@ function initEditor() {
       textarea.selectionStart = textarea.selectionEnd = start + 2;
     }
   });
+}
+
+function initPostFormEnhancements() {
+  const titleInput = document.getElementById('post-title');
+  const slugInput = document.getElementById('post-slug');
+
+  if (titleInput && slugInput) {
+    titleInput.addEventListener('blur', () => {
+      if (!slugInput.value.trim()) {
+        slugInput.value = sanitizeSlug(titleInput.value);
+      }
+    });
+
+    slugInput.addEventListener('input', () => {
+      slugInput.value = sanitizeSlug(slugInput.value);
+    });
+  }
 }
 
 // === 图片上传 ===
@@ -250,7 +269,7 @@ async function handleSavePost(event) {
   
   const postData = getPostFormData();
   const statusDiv = document.getElementById('save-status');
-  
+
   try {
     statusDiv.textContent = '发布中...';
     
@@ -266,14 +285,14 @@ async function handleSavePost(event) {
       body: JSON.stringify(postData)
     });
     
-    if (!response.ok) {
-      throw new Error('Save failed');
-    }
-    
     const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || '保存失败');
+    }
+
     statusDiv.textContent = '发布成功！';
     statusDiv.style.color = 'green';
-    
+
     // 清除草稿
     clearDraft();
     
@@ -301,10 +320,10 @@ function getPostFormData() {
   const draft = document.getElementById('post-draft').checked;
   
   const tags = tagsInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
-  
+
   return {
     title,
-    slug: slug || generateSlug(title),
+    slug: sanitizeSlug(slug || title),
     content,
     excerpt: excerpt || content.substring(0, 200),
     category,
@@ -315,9 +334,15 @@ function getPostFormData() {
   };
 }
 
-function generateSlug(title) {
-  // 简单的 slug 生成：拼音或时间戳
-  return Date.now().toString(36);
+function sanitizeSlug(value) {
+  return (value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
 }
 
 // === 自动保存草稿 ===
@@ -393,8 +418,12 @@ async function loadPostsList() {
   
   try {
     const response = await fetch('/api/posts?all=true');
+    if (!response.ok) {
+      throw new Error('加载文章列表失败');
+    }
+
     const data = await response.json();
-    
+
     content.innerHTML = `
       <div class="admin-form">
         <h2>所有文章</h2>
@@ -427,8 +456,12 @@ async function loadPostsList() {
 async function editPost(postId) {
   try {
     const response = await fetch(`/api/post/${postId}`);
+    if (!response.ok) {
+      throw new Error('加载文章失败');
+    }
+
     const post = await response.json();
-    
+
     AdminApp.currentPost = post;
     AdminApp.isEditing = true;
     

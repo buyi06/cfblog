@@ -8,10 +8,18 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 }
 
-// 生成 slug
-function generateSlug(title) {
-  // 简化版：使用时间戳
-  return Date.now().toString(36);
+// 生成易读的 slug（会在保存时进一步确保唯一）
+function buildSlug(title = '') {
+  const normalized = title
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+
+  return normalized || Date.now().toString(36);
 }
 
 // 验证密码
@@ -50,9 +58,9 @@ function parseCookies(cookieHeader) {
 async function validateSession(request, env) {
   const cookies = parseCookies(request.headers.get('Cookie'));
   const sessionId = cookies.session;
-  
+
   if (!sessionId) return false;
-  
+
   const session = await env.BLOG.get(`session:${sessionId}`);
   return session !== null;
 }
@@ -70,42 +78,65 @@ function jsonResponse(data, status = 200) {
 
 // === KV 数据库操作 ===
 
+// 从索引拉取全部文章（用于分页/搜索等场景）
+async function getAllPosts(env) {
+  const indexKey = 'idx:post:time';
+  const indexData = await env.BLOG.get(indexKey, 'json');
+
+  if (!Array.isArray(indexData) || indexData.length === 0) {
+    return [];
+  }
+
+  const posts = await Promise.all(
+    indexData.map(async (id) => env.BLOG.get(`post:id:${id}`, 'json'))
+  );
+
+  return posts.filter(Boolean);
+}
+
 // 获取文章列表
 async function getPosts(env, options = {}) {
   const { page = 1, limit = 10, archive = false, all = false } = options;
-  
-  // 从索引获取文章 ID 列表
-  const indexKey = 'idx:post:time';
-  const indexData = await env.BLOG.get(indexKey, 'json');
-  
-  if (!indexData || indexData.length === 0) {
+
+  // 基本参数校验与限制，防止过大的分页参数导致性能问题
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const safeLimitRaw = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 10;
+  const safeLimit = Math.min(safeLimitRaw, 100);
+
+  const existingPosts = await getAllPosts(env);
+
+  if (existingPosts.length === 0) {
     return { posts: [], total: 0, totalPages: 0 };
   }
-  
-  // 分页
-  const start = all ? 0 : (page - 1) * limit;
-  const end = all ? indexData.length : start + limit;
-  const paginatedIds = indexData.slice(start, end);
-  
-  // 获取文章详情
-  const posts = await Promise.all(
-    paginatedIds.map(async (id) => {
-      const post = await env.BLOG.get(`post:id:${id}`, 'json');
-      return post;
-    })
-  );
-  
-  const filteredPosts = posts.filter(p => p !== null);
-  
-  // 如果不是全部模式，过滤掉草稿
-  const finalPosts = all 
-    ? filteredPosts 
-    : filteredPosts.filter(p => p.status !== 'draft');
-  
+
+  const shouldReturnAll = archive || all;
+  const visiblePosts = shouldReturnAll && all
+    ? existingPosts
+    : existingPosts.filter(p => p.status !== 'draft');
+
+  const sortedPosts = [...visiblePosts].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+
+  if (shouldReturnAll) {
+    return {
+      posts: sortedPosts,
+      total: sortedPosts.length,
+      totalPages: 1
+    };
+  }
+
+  const start = (safePage - 1) * safeLimit;
+  const end = start + safeLimit;
+  const paginatedPosts = sortedPosts.slice(start, end);
+  const totalPages = Math.ceil(sortedPosts.length / safeLimit) || 1;
+
   return {
-    posts: finalPosts,
-    total: indexData.length,
-    totalPages: Math.ceil(indexData.length / limit)
+    posts: paginatedPosts,
+    total: sortedPosts.length,
+    totalPages
   };
 }
 
@@ -122,37 +153,104 @@ async function getPost(env, slugOrId) {
   return await env.BLOG.get(`post:id:${slugOrId}`, 'json');
 }
 
+function normalizeTags(tags) {
+  if (!tags) return [];
+  if (Array.isArray(tags)) {
+    return tags.map(tag => String(tag).trim()).filter(Boolean);
+  }
+  return String(tags)
+    .split(',')
+    .map(tag => tag.trim())
+    .filter(Boolean);
+}
+
+function createExcerpt(content, fallback = '') {
+  if (!content) return fallback;
+  const plain = content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/[#>*_\-]+/g, '')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1');
+
+  return (plain || fallback).substring(0, 200);
+}
+
+function validatePostPayload(postData) {
+  if (!postData || typeof postData !== 'object') {
+    return '无效的请求数据';
+  }
+  if (!postData.title || !String(postData.title).trim()) {
+    return '标题不能为空';
+  }
+  if (!postData.content || !String(postData.content).trim()) {
+    return '内容不能为空';
+  }
+  return null;
+}
+
+async function ensureUniqueSlug(env, desiredSlug, currentId = null) {
+  let slug = desiredSlug;
+  let suffix = 1;
+
+  while (suffix < 50) {
+    const existingId = await env.BLOG.get(`post:slug:${slug}`);
+    if (!existingId || existingId === currentId) {
+      return slug;
+    }
+
+    slug = `${desiredSlug}-${suffix}`;
+    suffix += 1;
+  }
+
+  return `${desiredSlug}-${generateId()}`;
+}
+
 // 保存文章
 async function savePost(env, postData) {
+  const validationError = validatePostPayload(postData);
+  if (validationError) {
+    return { error: validationError };
+  }
+
   const id = postData.id || generateId();
-  const slug = postData.slug || generateSlug(postData.title);
   const now = Date.now();
-  
+  const normalizedTags = normalizeTags(postData.tags);
+  const status = postData.status === 'draft' ? 'draft' : 'published';
+
+  // 如果已有文章且 slug 被修改，需要清理旧的映射
+  const existingPost = postData.id ? await env.BLOG.get(`post:id:${postData.id}`, 'json') : null;
+  const baseSlug = buildSlug(postData.slug || postData.title || existingPost?.title || '');
+  const slug = await ensureUniqueSlug(env, baseSlug, existingPost?.id || null);
+
+  if (existingPost && existingPost.slug && existingPost.slug !== slug) {
+    await env.BLOG.delete(`post:slug:${existingPost.slug}`);
+  }
+
   const post = {
     id,
     slug,
-    title: postData.title,
-    content: postData.content,
-    excerpt: postData.excerpt || postData.content.substring(0, 200),
-    category: postData.category || '',
-    tags: postData.tags || [],
+    title: String(postData.title).trim(),
+    content: String(postData.content),
+    excerpt: postData.excerpt ? String(postData.excerpt).trim() : createExcerpt(postData.content, existingPost?.excerpt || ''),
+    category: postData.category ? String(postData.category).trim() : '',
+    tags: normalizedTags,
     cover: postData.cover || '',
-    status: postData.status || 'published',
-    pinned: postData.pinned || false,
-    views: postData.views || 0,
-    createdAt: postData.createdAt || now,
+    status,
+    pinned: Boolean(postData.pinned),
+    views: postData.views || existingPost?.views || 0,
+    createdAt: postData.createdAt || existingPost?.createdAt || now,
     updatedAt: now
   };
-  
+
   // 保存文章数据
   await env.BLOG.put(`post:id:${id}`, JSON.stringify(post));
-  
+
   // 保存 slug 映射
   await env.BLOG.put(`post:slug:${slug}`, id);
-  
+
   // 更新索引
   await updatePostIndex(env, id);
-  
+
   return post;
 }
 
@@ -160,12 +258,10 @@ async function savePost(env, postData) {
 async function updatePostIndex(env, postId) {
   const indexKey = 'idx:post:time';
   const indexData = await env.BLOG.get(indexKey, 'json') || [];
-  
-  // 如果不存在则添加到开头
-  if (!indexData.includes(postId)) {
-    indexData.unshift(postId);
-    await env.BLOG.put(indexKey, JSON.stringify(indexData));
-  }
+  const filtered = indexData.filter(id => id !== postId);
+
+  filtered.unshift(postId);
+  await env.BLOG.put(indexKey, JSON.stringify(filtered));
 }
 
 // 删除文章
@@ -292,14 +388,19 @@ async function handleSavePost(request, env, postId = null) {
   if (!isAuthed) {
     return jsonResponse({ error: 'Unauthorized' }, 401);
   }
-  
+
   const postData = await request.json();
-  
+
   if (postId) {
     postData.id = postId;
   }
-  
+
   const post = await savePost(env, postData);
+
+  if (post.error) {
+    return jsonResponse({ error: post.error }, 400);
+  }
+
   return jsonResponse(post);
 }
 
@@ -337,20 +438,22 @@ async function handleGetLinks(request, env) {
 // 搜索文章
 async function handleSearch(request, env) {
   const url = new URL(request.url);
-  const keyword = url.searchParams.get('q');
-  
+  const keyword = (url.searchParams.get('q') || '').trim();
+
   if (!keyword) {
     return jsonResponse([]);
   }
-  
-  const { posts } = await getPosts(env, { all: false, limit: 100 });
-  
-  const results = posts.filter(post => 
-    post.title.includes(keyword) || 
-    post.content.includes(keyword) ||
-    post.excerpt.includes(keyword)
+
+  const posts = (await getAllPosts(env)).filter(post => post.status !== 'draft');
+
+  const lowerKeyword = keyword.toLowerCase();
+
+  const results = posts.filter(post =>
+    post.title.toLowerCase().includes(lowerKeyword) ||
+    post.content.toLowerCase().includes(lowerKeyword) ||
+    (post.excerpt || '').toLowerCase().includes(lowerKeyword)
   );
-  
+
   return jsonResponse(results);
 }
 
@@ -528,7 +631,10 @@ export async function onRequest(context) {
     // 返回静态 HTML，让前端 JS 处理
     return env.ASSETS.fetch(request);
   }
-  
+
   // 其他请求转发到静态资源
   return env.ASSETS.fetch(request);
 }
+
+// 便于在本地脚本或测试中复用
+export { getPosts, getAllPosts };
